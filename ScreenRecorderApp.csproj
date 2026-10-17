@@ -44,7 +44,7 @@
     <None Remove="tools\ffmpeg.exe" />
     <None Include="tools\ffmpeg.exe" Condition="Exists('tools\ffmpeg.exe')" Link="ffmpeg.exe"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
-    <None Update="HUONG-DAN.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="README.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
