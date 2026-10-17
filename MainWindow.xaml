@@ -1,0 +1,617 @@
+<Window x:Class="ScreenRecorderApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="clr-namespace:ScreenRecorderApp.Controls"
+        Title="Screen Recorder" Width="1220" Height="860" MinWidth="1020" MinHeight="720"
+        Background="{StaticResource BgBrush}" Foreground="{StaticResource TextBrush}"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13"
+        WindowStartupLocation="CenterScreen" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display">
+
+    <Grid>
+        <!-- Anh sang nen trang tri -->
+        <Ellipse Width="700" Height="500" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-250,-260,0,0" IsHitTestVisible="False">
+            <Ellipse.Fill>
+                <RadialGradientBrush>
+                    <GradientStop Color="#40A08AFF" Offset="0"/>
+                    <GradientStop Color="#00A08AFF" Offset="1"/>
+                </RadialGradientBrush>
+            </Ellipse.Fill>
+        </Ellipse>
+        <Ellipse Width="600" Height="460" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-220,-240" IsHitTestVisible="False">
+            <Ellipse.Fill>
+                <RadialGradientBrush>
+                    <GradientStop Color="#2E62CEFF" Offset="0"/>
+                    <GradientStop Color="#0062CEFF" Offset="1"/>
+                </RadialGradientBrush>
+            </Ellipse.Fill>
+        </Ellipse>
+
+        <Grid Margin="22,16,22,18">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- ======================= HEADER ======================= -->
+            <Grid Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="44" Height="44" CornerRadius="13" Background="{StaticResource RecordGradient}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#FF2D55" BlurRadius="20" ShadowDepth="0" Opacity="0.5"/>
+                    </Border.Effect>
+                    <TextBlock Text="&#xE7C8;" Style="{StaticResource Icon}" FontSize="20" Foreground="White"/>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Screen Recorder" FontSize="21" FontWeight="SemiBold" FontFamily="{StaticResource DisplayFont}"/>
+                    <TextBlock Text="FFmpeg chạy nền  •  Âm thanh hệ thống (WASAPI loopback) + Microphone" Style="{StaticResource Hint}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border x:Name="StatusPill" CornerRadius="15" Padding="12,6" Background="{StaticResource Surface2Brush}"
+                            BorderBrush="{StaticResource LineBrush}" BorderThickness="1" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="StatusDot" Width="9" Height="9" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="StatusText" Text="Sẵn sàng" Margin="8,0,0,0" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock x:Name="TimerText" Text="00:00:00" FontFamily="{StaticResource MonoFont}" FontSize="30"
+                               Margin="18,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- ======================= CONTENT ======================= -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.2*"/>
+                    <ColumnDefinition Width="18"/>
+                    <ColumnDefinition Width="1*" MinWidth="440"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ============ LEFT: Screen ============ -->
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Style="{StaticResource Card}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <DockPanel LastChildFill="False">
+                                <Border Style="{StaticResource IconBadge}" DockPanel.Dock="Left">
+                                    <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="15" Foreground="{StaticResource AccentBrush}"/>
+                                </Border>
+                                <StackPanel DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Màn hình ghi" Style="{StaticResource CardTitle}"/>
+                                    <TextBlock Text="Bấm vào ảnh bên dưới để chọn màn hình cần ghi" Style="{StaticResource Hint}"/>
+                                </StackPanel>
+                                <Button x:Name="RefreshMonitorsButton" DockPanel.Dock="Right" Style="{StaticResource GhostButton}"
+                                        Click="RefreshMonitors_Click" ToolTip="Tải lại danh sách màn hình">
+                                    <TextBlock Text="&#xE72C;" Style="{StaticResource Icon}" FontSize="14"/>
+                                </Button>
+                                <Button x:Name="IdentifyButton" DockPanel.Dock="Right" Margin="0,0,6,0" Click="Identify_Click"
+                                        ToolTip="Hiện số thứ tự lên từng màn hình">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE890;" Style="{StaticResource Icon}" FontSize="13"/>
+                                        <TextBlock Text="Nhận diện" Margin="8,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                            </DockPanel>
+
+                            <Border Grid.Row="1" Margin="0,14,0,14" CornerRadius="10" Background="{StaticResource PreviewBgBrush}"
+                                    BorderBrush="{StaticResource LineBrush}" BorderThickness="1" ClipToBounds="True" MinHeight="170">
+                                <Grid>
+                                    <Image x:Name="PreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" Margin="2"/>
+                                    <TextBlock x:Name="PreviewPlaceholder" Text="Đang tải xem trước…" Style="{StaticResource Hint}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <Border x:Name="RecBadge" Visibility="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                            Margin="12" CornerRadius="6" Padding="9,4" Background="#E6FF2D55">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="7" Height="7" Fill="White" VerticalAlignment="Center"/>
+                                            <TextBlock Text="REC" Margin="6,0,0,0" Foreground="White" FontWeight="Bold" FontSize="11"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10" CornerRadius="6"
+                                            Padding="9,4" Background="#B3000000">
+                                        <TextBlock x:Name="PreviewInfo" Text="" Foreground="White" FontSize="11"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Chon man hinh bang anh thu nho (cap nhat lien tuc) -->
+                            <ListBox x:Name="MonitorList" Grid.Row="2" Style="{StaticResource MonitorPicker}"
+                                     ItemContainerStyle="{StaticResource MonitorCard}" Padding="0,6,0,0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Width="132">
+                                            <Border Height="70" CornerRadius="6" Background="{StaticResource PreviewBgBrush}" ClipToBounds="True">
+                                                <Grid>
+                                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4" MinWidth="18" Height="18"
+                                                            CornerRadius="5" Background="#CC14171F" Padding="4,0">
+                                                        <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="Bold" Foreground="White"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                            <TextBlock Text="{Binding Title}" Margin="2,7,0,0" FontWeight="SemiBold" FontSize="12.5"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Subtitle}" Margin="2,1,0,0" FontSize="11.5"
+                                                       Foreground="{StaticResource MutedBrush}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <Grid Grid.Row="3" Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Phương thức chụp" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="CaptureCombo"/>
+                                </StackPanel>
+                                <CheckBox x:Name="DrawMouseCheck" Grid.Column="2" VerticalAlignment="Bottom" Margin="0,0,0,7"
+                                          Content="Hiện con trỏ chuột"/>
+                            </Grid>
+                            <TextBlock x:Name="CaptureHint" Grid.Row="4" Margin="0,8,0,0" Style="{StaticResource Hint}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Stats -->
+                    <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,14,0,0" Padding="8,10">
+                        <UniformGrid Columns="4">
+                            <StackPanel Margin="10,0">
+                                <TextBlock Text="FPS thực tế" Style="{StaticResource Hint}"/>
+                                <TextBlock x:Name="StatFps" Text="—" FontSize="19" FontWeight="SemiBold" FontFamily="{StaticResource MonoFont}"/>
+                            </StackPanel>
+                            <StackPanel Margin="10,0">
+                                <TextBlock Text="Dung lượng" Style="{StaticResource Hint}"/>
+                                <TextBlock x:Name="StatSize" Text="—" FontSize="19" FontWeight="SemiBold" FontFamily="{StaticResource MonoFont}"/>
+                            </StackPanel>
+                            <StackPanel Margin="10,0">
+                                <TextBlock Text="Tốc độ mã hóa" Style="{StaticResource Hint}"/>
+                                <TextBlock x:Name="StatSpeed" Text="—" FontSize="19" FontWeight="SemiBold" FontFamily="{StaticResource MonoFont}"/>
+                            </StackPanel>
+                            <StackPanel Margin="10,0">
+                                <TextBlock Text="Khung rớt / lặp" Style="{StaticResource Hint}"/>
+                                <TextBlock x:Name="StatDrop" Text="—" FontSize="19" FontWeight="SemiBold" FontFamily="{StaticResource MonoFont}"/>
+                            </StackPanel>
+                        </UniformGrid>
+                    </Border>
+                </Grid>
+
+                <!-- ============ RIGHT: Tabs ============ -->
+                <TabControl Grid.Column="2" x:Name="Tabs">
+
+                    <!-- ===== AUDIO ===== -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE767;" Style="{StaticResource Icon}" FontSize="13"/>
+                                <TextBlock Text="Âm thanh" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+                            <StackPanel>
+                                <!-- System audio -->
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Style="{StaticResource IconBadge}" Background="{StaticResource CyanSoftBrush}">
+                                                <TextBlock Text="&#xE7F5;" Style="{StaticResource Icon}" FontSize="15" Foreground="{StaticResource CyanBrush}"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="Âm thanh hệ thống (loa / tai nghe)" Style="{StaticResource CardTitle}"/>
+                                                <TextBlock x:Name="SysFormatText" Text="Mọi âm thanh phát ra thiết bị này" Style="{StaticResource Hint}"/>
+                                            </StackPanel>
+                                            <CheckBox x:Name="SysEnabled" Grid.Column="2" ToolTip="Bật/tắt thu âm thanh hệ thống"/>
+                                        </Grid>
+                                        <ComboBox x:Name="SysDeviceCombo" Margin="0,14,0,0"/>
+                                        <ctl:LevelMeter x:Name="SysMeter" Height="9" Margin="0,12,0,0"/>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="48"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Âm lượng" Style="{StaticResource Hint}" VerticalAlignment="Center"/>
+                                            <Slider x:Name="SysVolume" Grid.Column="1" Minimum="0" Maximum="200" Margin="12,0,8,0"
+                                                    SmallChange="5" LargeChange="10"/>
+                                            <TextBlock x:Name="SysVolumeText" Grid.Column="2" Text="100%" VerticalAlignment="Center"
+                                                       FontFamily="{StaticResource MonoFont}"/>
+                                            <Button x:Name="SysTestButton" Grid.Column="3" Click="SysTest_Click"
+                                                    ToolTip="Phát tiếng 'ting' ra thiết bị này — thanh mức âm phải nhảy lên">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE768;" Style="{StaticResource Icon}" FontSize="12"/>
+                                                    <TextBlock Text="Phát thử" Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Microphone -->
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Style="{StaticResource IconBadge}">
+                                                <TextBlock Text="&#xE720;" Style="{StaticResource Icon}" FontSize="15" Foreground="{StaticResource AccentBrush}"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="Microphone" Style="{StaticResource CardTitle}"/>
+                                                    <Border x:Name="MicMutedBadge" Visibility="Collapsed" Margin="10,0,0,0" CornerRadius="5"
+                                                            Padding="7,1" Background="#40FF5274" VerticalAlignment="Center">
+                                                        <TextBlock Text="ĐÃ TẮT TIẾNG" FontSize="10" FontWeight="Bold" Foreground="{StaticResource RecordBrush}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock x:Name="MicFormatText" Text="Giọng nói của bạn" Style="{StaticResource Hint}"/>
+                                            </StackPanel>
+                                            <CheckBox x:Name="MicEnabled" Grid.Column="2" ToolTip="Bật/tắt thu microphone"/>
+                                        </Grid>
+                                        <ComboBox x:Name="MicDeviceCombo" Margin="0,14,0,0"/>
+                                        <ctl:LevelMeter x:Name="MicMeter" Height="9" Margin="0,12,0,0"/>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="48"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Âm lượng" Style="{StaticResource Hint}" VerticalAlignment="Center"/>
+                                            <Slider x:Name="MicVolume" Grid.Column="1" Minimum="0" Maximum="300" Margin="12,0,8,0"
+                                                    SmallChange="5" LargeChange="10"/>
+                                            <TextBlock x:Name="MicVolumeText" Grid.Column="2" Text="100%" VerticalAlignment="Center"
+                                                       FontFamily="{StaticResource MonoFont}"/>
+                                            <Button x:Name="MicTestButton" Grid.Column="3" Click="MicTest_Click"
+                                                    ToolTip="Thu 5 giây rồi phát lại qua loa đã chọn ở trên">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE7C8;" Style="{StaticResource Icon}" FontSize="12" Foreground="{StaticResource RecordBrush}"/>
+                                                    <TextBlock x:Name="MicTestLabel" Text="Thu thử 5 giây" Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                        <CheckBox x:Name="NoiseFilterCheck" Margin="0,14,0,0"
+                                                  Content="Lọc tiếng ồn micro (quạt, tiếng xì nền)"
+                                                  ToolTip="Dùng bộ lọc FFT của FFmpeg (afftdn + noise gate) cho riêng micro"/>
+
+                                        <!-- Xu ly giong noi SAU khi loc on -->
+                                        <Border Margin="0,14,0,0" CornerRadius="10" Padding="12,10" Background="{StaticResource Surface2Brush}"
+                                                BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="58"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="Tăng giọng sau lọc" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                                    <Slider x:Name="MicBoostSlider" Grid.Column="1" Minimum="0" Maximum="24" Margin="12,0,8,0"
+                                                            SmallChange="1" LargeChange="3" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                            ToolTip="Khuếch đại giọng nói sau khi đã lọc ồn (không làm tiếng ồn nền to lên như thanh Âm lượng)"/>
+                                                    <TextBlock x:Name="MicBoostText" Grid.Column="2" Text="+8 dB" VerticalAlignment="Center"
+                                                               TextAlignment="Right" FontFamily="{StaticResource MonoFont}"/>
+                                                </Grid>
+                                                <CheckBox x:Name="VoiceLevelerCheck" Margin="0,10,0,0"
+                                                          Content="Cân bằng giọng nói (nói nhỏ được nâng lên, nói to không bị vỡ)"
+                                                          ToolTip="Bộ nén (compressor) cho micro — giọng đều và rõ hơn so với nhạc/âm thanh hệ thống"/>
+                                                <CheckBox x:Name="DuckingCheck" Margin="0,10,0,0"
+                                                          Content="Tự giảm âm thanh hệ thống khi bạn nói"
+                                                          ToolTip="Khi micro có tiếng nói, âm thanh loa trong video được giảm xuống để giọng nổi bật"/>
+                                                <TextBlock Margin="0,8,0,0" Style="{StaticResource Hint}"
+                                                           Text="Áp dụng khi ghi và khi “Thu thử 5 giây” (nghe lại đúng như trong video)."/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Margin="0,12,0,0" CornerRadius="12" Padding="14,12" Background="#1E3448"
+                                        BorderBrush="#2F5878" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE946;" Style="{StaticResource Icon}" Foreground="{StaticResource CyanBrush}" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                        <TextBlock Grid.Column="1" Margin="10,0,10,0" Style="{StaticResource Hint}"
+                                                   Text="Âm thanh hệ thống được thu trực tiếp bằng WASAPI loopback — không cần bật Stereo Mix, không cần quyền Admin. Phím tắt: Ctrl+Alt+M để tắt/bật tiếng micro."/>
+                                        <Button x:Name="RefreshAudioButton" Grid.Column="2" Style="{StaticResource GhostButton}"
+                                                Click="RefreshAudio_Click" ToolTip="Tải lại danh sách thiết bị âm thanh" VerticalAlignment="Top">
+                                            <TextBlock Text="&#xE72C;" Style="{StaticResource Icon}" FontSize="14"/>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- ===== VIDEO ===== -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE714;" Style="{StaticResource Icon}" FontSize="13"/>
+                                <TextBlock Text="Video" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+                            <StackPanel>
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock Text="Bộ mã hóa video" Style="{StaticResource FieldLabel}"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="EncoderCombo"/>
+                                            <Button x:Name="ProbeButton" Grid.Column="1" Margin="8,0,0,0" Click="Probe_Click"
+                                                    ToolTip="Kiểm tra lại các bộ mã hóa phần cứng">
+                                                <TextBlock Text="&#xE72C;" Style="{StaticResource Icon}" FontSize="13"/>
+                                            </Button>
+                                        </Grid>
+                                        <TextBlock x:Name="EncoderHint" Margin="0,6,0,0" Style="{StaticResource Hint}" Text=""/>
+
+                                        <Grid Margin="0,16,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="Khung hình / giây" Style="{StaticResource FieldLabel}"/>
+                                                <ComboBox x:Name="FpsCombo"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Chất lượng" Style="{StaticResource FieldLabel}"/>
+                                                <ComboBox x:Name="QualityCombo"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,14,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="Độ phân giải xuất" Style="{StaticResource FieldLabel}"/>
+                                                <ComboBox x:Name="ResolutionCombo"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Định dạng file" Style="{StaticResource FieldLabel}"/>
+                                                <ComboBox x:Name="FormatCombo"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Thư mục lưu video" Style="{StaticResource FieldLabel}"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="OutputDirBox"/>
+                                            <Button x:Name="BrowseOutputButton" Grid.Column="1" Margin="8,0,0,0" Click="BrowseOutput_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE838;" Style="{StaticResource Icon}" FontSize="13"/>
+                                                    <TextBlock Text="Chọn…" Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                        <TextBlock Margin="0,8,0,0" Style="{StaticResource Hint}"
+                                                   Text="Video luôn được ghi an toàn dạng MKV (không hỏng file nếu mất điện), sau khi dừng sẽ tự chuyển sang MP4 nếu chọn MP4."/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- ===== ADVANCED ===== -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE713;" Style="{StaticResource Icon}" FontSize="13"/>
+                                <TextBlock Text="Nâng cao" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+                            <StackPanel>
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock Text="Lệch tiếng so với hình" Style="{StaticResource FieldLabel}"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="70"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Slider x:Name="OffsetSlider" Minimum="-1000" Maximum="1000" SmallChange="10" LargeChange="50"
+                                                    TickFrequency="10" IsSnapToTickEnabled="True"/>
+                                            <TextBlock x:Name="OffsetText" Grid.Column="1" Text="0 ms" TextAlignment="Right"
+                                                       VerticalAlignment="Center" FontFamily="{StaticResource MonoFont}"/>
+                                        </Grid>
+                                        <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                                   Text="Dương = tiếng chậm lại, âm = tiếng sớm lên. Chỉ chỉnh nếu ghi thử thấy tiếng lệch môi."/>
+
+                                        <Grid Margin="0,16,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="Bitrate âm thanh (AAC)" Style="{StaticResource FieldLabel}"/>
+                                                <ComboBox x:Name="BitrateCombo"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <CheckBox x:Name="SeparateTracksCheck" Margin="0,16,0,0"
+                                                  Content="Lưu thêm track riêng cho mic và âm thanh hệ thống"
+                                                  ToolTip="Track 1 = trộn chung, track 2 = mic, track 3 = hệ thống (tiện cho chỉnh sửa video)"/>
+                                        <CheckBox x:Name="CountdownCheck" Margin="0,12,0,0" Content="Đếm ngược 3 giây trước khi ghi"/>
+                                        <CheckBox x:Name="TrayCheck" Margin="0,12,0,0" Content="Thu nhỏ xuống khay hệ thống khi đang ghi"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="FFmpeg" Style="{StaticResource FieldLabel}"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="FfmpegPathBox"/>
+                                            <Button x:Name="BrowseFfmpegButton" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFfmpeg_Click" Content="Chọn…"/>
+                                        </Grid>
+                                        <TextBlock x:Name="FfmpegVersionText" Margin="0,6,0,0" Style="{StaticResource Hint}" Text=""/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Style="{StaticResource IconBadge}" Background="#4D3B17">
+                                                <TextBlock Text="&#xEA18;" Style="{StaticResource Icon}" FontSize="15" Foreground="{StaticResource WarnBrush}"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="Quyền hệ thống" Style="{StaticResource CardTitle}"/>
+                                                <TextBlock x:Name="AdminText" Style="{StaticResource Hint}" Text=""/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <WrapPanel Margin="0,12,0,0">
+                                            <Button x:Name="AdminButton" Click="Admin_Click" Margin="0,0,8,0"
+                                                    ToolTip="Chỉ cần khi muốn ghi cửa sổ của ứng dụng đang chạy bằng quyền Admin">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xEA18;" Style="{StaticResource Icon}" FontSize="12"/>
+                                                    <TextBlock Text="Chạy lại với quyền Admin" Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="SoundSettingsButton" Click="SoundSettings_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE767;" Style="{StaticResource Icon}" FontSize="12"/>
+                                                    <TextBlock Text="Mở cài đặt âm thanh Windows" Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- ===== LOG ===== -->
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE9D9;" Style="{StaticResource Icon}" FontSize="13"/>
+                                <TextBlock Text="Nhật ký" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBox x:Name="LogBox" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
+                                     VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top"
+                                     FontFamily="{StaticResource MonoFont}" FontSize="11.5" Background="#1A1E29"/>
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,0">
+                                <Button x:Name="CopyCmdButton" Click="CopyCmd_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE8C8;" Style="{StaticResource Icon}" FontSize="12"/>
+                                        <TextBlock Text="Sao chép lệnh FFmpeg" Margin="8,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Margin="8,0,0,0" Click="ClearLog_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE74D;" Style="{StaticResource Icon}" FontSize="12"/>
+                                        <TextBlock Text="Xóa nhật ký" Margin="8,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+
+            <!-- ======================= BOTTOM BAR ======================= -->
+            <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="14">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="RecordButton" Style="{StaticResource RecordButton}" Click="RecordButton_Click" MinWidth="200"
+                            ToolTip="Ctrl+Alt+R">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="RecordIcon" Text="&#xE7C8;" Style="{StaticResource Icon}" FontSize="16"/>
+                            <TextBlock x:Name="RecordLabel" Text="Bắt đầu ghi" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="TestRecordButton" Grid.Column="1" Margin="12,0,0,0" Padding="16,10" Click="TestRecord_Click"
+                            ToolTip="Ghi thử 10 giây với cấu hình hiện tại rồi tự mở video để kiểm tra hình và tiếng">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE916;" Style="{StaticResource Icon}" FontSize="14"/>
+                            <TextBlock x:Name="TestRecordLabel" Text="Ghi thử 10 giây" Margin="8,0,0,0"/>
+                        </StackPanel>
+                    </Button>
+                    <StackPanel Grid.Column="2" Margin="18,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="HintText" Style="{StaticResource Hint}"
+                                   Text="Phím tắt toàn cục: Ctrl+Alt+R bắt đầu / dừng  •  Ctrl+Alt+M tắt / bật micro"/>
+                        <TextBlock x:Name="LastFileText" Text="" FontSize="12" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="OpenFileButton" IsEnabled="False" Click="OpenFile_Click" Style="{StaticResource PrimaryButton}" Padding="14,9">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE768;" Style="{StaticResource Icon}" FontSize="12"/>
+                                <TextBlock Text="Mở video" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Margin="8,0,0,0" Padding="14,9" Click="OpenFolder_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE838;" Style="{StaticResource Icon}" FontSize="13"/>
+                                <TextBlock Text="Thư mục" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

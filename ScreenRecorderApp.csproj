@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- .NET Framework 4.8: co san tren moi Windows 10/11, khong can cai them runtime -->
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>ScreenRecorder</AssemblyName>
+    <RootNamespace>ScreenRecorderApp</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Version>1.0.0</Version>
+    <Product>Screen Recorder</Product>
+    <Company>Screen Recorder</Company>
+    <Description>Ghi man hinh + am thanh he thong + microphone (FFmpeg chay nen)</Description>
+    <NoWarn>$(NoWarn);CS8632</NoWarn>
+    <!-- Thu muc dong goi (make-dist.ps1) khong thuoc ma nguon -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);dist\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Chi can phan WASAPI cua NAudio (kem NAudio.Core) -->
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+
+  <!-- Ban Release gon de mang sang may khac: khong tao .pdb -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- Tu chep tools\ffmpeg.exe (nam trong project) vao canh ScreenRecorder.exe -->
+  <ItemGroup>
+    <None Remove="tools\ffmpeg.exe" />
+    <None Include="tools\ffmpeg.exe" Condition="Exists('tools\ffmpeg.exe')" Link="ffmpeg.exe"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Update="HUONG-DAN.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
