@@ -31,7 +31,7 @@ Ghi lại các buổi học online để **xem lại khi cần**: nghe lại ch�
 
 ## 📥 Tải về và chạy
 
-1. Tải **`ScreenRecorder.zip`** tại trang [**Releases**](https://github.com/minhngoc8181/ScreenRecorderApp/releases/latest).
+1. Tải **`ScreenRecorder-vX.Y.Z.zip`** (bản mới nhất) tại trang [**Releases**](https://github.com/minhngoc8181/ScreenRecorderApp/releases/latest).
 2. Giải nén ra một thư mục bất kỳ.
 3. Nhấp đúp **`ScreenRecorder.exe`**.
 
@@ -120,7 +120,17 @@ git clone https://github.com/minhngoc8181/ScreenRecorderApp.git
 cd ScreenRecorderApp
 # Đặt ffmpeg.exe vào tools\  (tải tại https://www.gyan.dev/ffmpeg/builds/)
 dotnet build -c Release                                      # -> bin\Release\net48\
-powershell -ExecutionPolicy Bypass -File .\make-dist.ps1     # -> dist\ScreenRecorder.zip
+powershell -ExecutionPolicy Bypass -File .\make-dist.ps1     # -> dist\ScreenRecorder-v<version>.zip
+```
+
+**Phát hành bản mới** (GitHub Actions tự build và tạo Release):
+
+1. Tăng `<Version>` trong `ScreenRecorderApp.csproj` và thêm mục `## <version>` vào `CHANGELOG.md`.
+2. Commit, rồi tạo tag khớp số phiên bản và push:
+
+```powershell
+git tag v1.1.0
+git push origin main v1.1.0
 ```
 
 **Chẩn đoán** (chạy tại thư mục chương trình, kết quả ghi ra file `.log` cạnh exe):
@@ -142,4 +152,4 @@ Xem [lịch sử phiên bản](CHANGELOG.md).
 
 ---
 
-<sub>🌐 <b>English:</b> a free, portable Windows screen recorder made for capturing online lessons — screen, system audio and microphone — so you can review them anytime. Download <code>ScreenRecorder.zip</code> from <a href="https://github.com/minhngoc8181/ScreenRecorderApp/releases/latest">Releases</a>, unzip and run. Built through vibe coding with an AI assistant.</sub>
+<sub>🌐 <b>English:</b> a free, portable Windows screen recorder made for capturing online lessons — screen, system audio and microphone — so you can review them anytime. Download <code>ScreenRecorder-vX.Y.Z.zip</code> from <a href="https://github.com/minhngoc8181/ScreenRecorderApp/releases/latest">Releases</a>, unzip and run. Built through vibe coding with an AI assistant.</sub>

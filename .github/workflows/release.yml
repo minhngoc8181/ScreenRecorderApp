@@ -1,0 +1,51 @@
+# Tu dong build va tao GitHub Release khi push tag dang v*, vi du:
+#   git tag v1.1.0
+#   git push origin v1.1.0
+# Tag phai khop voi <Version> trong ScreenRecorderApp.csproj (v1.1.0 <-> 1.1.0).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Check tag matches project version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $v = ([xml](Get-Content ScreenRecorderApp.csproj -Raw)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          $tag = '${{ github.ref_name }}'.TrimStart('v','V')
+          if ($tag -ne $v.Trim()) { throw "Tag ${{ github.ref_name }} khong khop Version $v trong csproj" }
+
+      - name: Build & package
+        shell: pwsh
+        run: ./make-dist.ps1
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Screen Recorder ${{ github.ref_name }}
+          body_path: dist/RELEASE_NOTES.md
+          files: dist/ScreenRecorder-*.zip
+
+      - name: Upload artifact (manual run)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScreenRecorder
+          path: dist/ScreenRecorder-*.zip
