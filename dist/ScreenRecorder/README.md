@@ -25,6 +25,8 @@ Ghi lại các buổi học online để **xem lại khi cần**: nghe lại ch�
 - 🎙️ **Giọng rõ, ồn ít**: tự lọc tiếng quạt, tiếng xì nền và tăng giọng của bạn cho cân với tiếng loa.
 - 🖥️ **Chọn màn hình bằng hình ảnh**: bấm vào màn hình muốn ghi, kể cả khi dùng nhiều màn hình.
 - 🧪 **Thử trước khi ghi**: phát chuông kiểm tra loa, thu thử 5 giây để nghe lại giọng mình.
+- ⚡ **Tối ưu máy yếu, nhẹ CPU**: mặc định 15 fps (đủ mượt cho slide lẫn hình thầy cô ở góc màn hình, tốn ít CPU), tự động chọn chụp qua GPU.
+- 💾 **File nhỏ, chữ vẫn nét**: không bao giờ tự giảm độ phân giải; file nhỏ hơn khoảng một nửa so với bản 1.0, có thêm tính năng nén video chạy nền.
 - 🧳 **Không cần cài đặt**: giải nén là chạy, không cần quyền Admin, không quảng cáo, không thu thập dữ liệu.
 
 ## 📥 Tải về và chạy
@@ -48,6 +50,43 @@ Video được lưu trong thư mục `videos` cạnh chương trình.
 
 **Phím tắt:** `Ctrl+Alt+R` bắt đầu/dừng ghi · `Ctrl+Alt+M` tắt/bật micro
 
+## 🎚️ Điều chỉnh chất lượng
+
+Từ bản **1.1**, chương trình mặc định chọn chế độ **nhẹ máy**, hợp với lớp học online (slide, bảng viết, chia sẻ màn hình, hình thầy cô ở một góc). Nếu cần video đẹp hơn, hãy chỉnh các mục dưới đây.
+
+| Tuỳ chọn | Ở đâu | Mặc định | Khi nào nên đổi |
+|---|---|---|---|
+| **Khung hình / giây** | tab **Video** | 15 fps | Giảm còn **10 fps** nếu máy yếu và bài chỉ có slide (hình thầy cô sẽ hơi giật khi cử động). Tăng lên **24–30 fps** khi bài có video, hoạt hình hoặc thao tác nhanh. 30 fps tốn CPU khoảng gấp đôi 15 fps. |
+| **Chất lượng** | tab **Video** | Trung bình | Chọn **Cao** khi chữ nhỏ, code, công thức bị nhoè. File lớn hơn khoảng 15%, CPU gần như không đổi. |
+| **Độ phân giải xuất** | tab **Video** | Gốc | Nên giữ **Gốc** để chữ rõ nét. Chương trình **không bao giờ tự giảm độ phân giải**, kể cả khi nén. |
+| **Nén video** | tab **Video** | Không nén | **Nén vừa**: nhỏ thêm, chữ vẫn nét. **Nén mạnh**: nhỏ nhất (tối đa 15 fps, tiếng mono). Cả hai giữ nguyên độ phân giải, chạy nền sau khi dừng ghi. |
+| **Phương thức chụp** | dưới ảnh màn hình | Tự động | Chọn **GDI** nếu video bị đen hoặc đứng hình. Cách này tốn CPU hơn. |
+| **Bộ mã hoá video** | tab **Video** | Tự động | Chỉ chọn **CPU (x264)** khi bộ mã hoá GPU bị lỗi, vì cách này tốn CPU nhiều. |
+| **Bitrate âm thanh** | tab **Nâng cao** | 128 kbps | Đủ rõ cho giọng nói. Tăng lên **160–192 kbps** nếu bài có nhiều nhạc. |
+
+**Gợi ý nhanh:**
+
+| Bạn cần | Khung hình | Chất lượng | Độ phân giải | Nén |
+|---|---|---|---|---|
+| Lớp học online thông thường *(mặc định)* | 15 fps | Trung bình | Gốc | Không |
+| Chữ nhỏ, code, công thức | 15 fps | Cao | Gốc | Không hoặc Vừa |
+| Bài có video, thao tác nhanh | 24–30 fps | Trung bình hoặc Cao | Gốc | Vừa |
+| Máy yếu, ổ cứng sắp đầy | 10 fps | Trung bình | Gốc | Mạnh |
+
+**Dung lượng tham khảo** (MB/giờ, đã gồm tiếng, đo trên buổi học 1080p thật; luôn giữ 1080p, chữ nét như bản gốc):
+
+| Nội dung bài giảng | Bản 1.0 | 1.1 mặc định | Nén vừa | Nén mạnh |
+|---|---|---|---|---|
+| Chỉ có slide / bảng viết | ~160 | ~80 | ~60 | ~40 |
+| Slide + thầy cô ở góc màn hình | ~230 | ~130 | ~80 | ~60 |
+
+> [!TIP]
+> Bài giảng phần lớn là hình đứng yên. Bản 1.1 tận dụng điều này: chỉ lưu **phần hình thay đổi**, mỗi 10 giây mới lưu lại một ảnh đầy đủ. Nhờ vậy file nhỏ hơn khoảng một nửa mà **chữ và hình thầy cô vẫn nét như cũ**, không cần giảm độ phân giải. Số khung hình/giây chủ yếu ảnh hưởng **CPU** và **độ mượt của hình người** (15 fps mượt gần như 30 fps), còn chữ thì không đổi.
+
+Muốn biết máy đang dùng cách chụp nào, xem dòng chữ dưới **Phương thức chụp** hoặc tab **Nhật ký**:
+- *"Đang dùng Desktop Duplication (GPU)"*: nhẹ CPU nhất.
+- *"→ dùng GDI"*: máy không hỗ trợ chụp qua GPU, chương trình tự chuyển sang GDI.
+
 ## 💡 Mẹo nhỏ
 
 | Gặp tình huống | Cách làm |
@@ -55,7 +94,8 @@ Video được lưu trong thư mục `videos` cạnh chương trình.
 | Giọng mình nhỏ hơn tiếng loa | Kéo **Tăng giọng sau lọc** lên +10…+14 dB, hoặc giảm **Âm lượng** âm thanh hệ thống xuống 60–80%. |
 | Video không có tiếng giảng viên | Chọn đúng loa/tai nghe đang dùng, bấm **Phát thử** thấy thanh âm thanh nhảy là được. |
 | Tiếng và hình lệch nhau | Chỉnh **Lệch tiếng so với hình** ở tab **Nâng cao**. |
-| Máy yếu, video bị giật | Giảm **Khung hình / giây** hoặc **Độ phân giải xuất** ở tab **Video**. |
+| Máy yếu, video bị giật | Giảm xuống **10 fps** và giữ phương thức chụp **Tự động**. |
+| Muốn video nhẹ hơn để nộp/gửi bài | Bật **Nén vừa** hoặc **Nén mạnh** ở tab **Video** (chạy nền sau khi học xong, không làm chậm máy khi đang ghi). |
 | Muốn thử nhanh | Bấm **Ghi thử 10 giây**, video sẽ tự mở để bạn kiểm tra. |
 
 Vẫn chưa được? Hãy gửi mô tả lỗi kèm nội dung tab **Nhật ký** tại mục [Issues](https://github.com/minhngoc8181/ScreenRecorderApp/issues).
@@ -92,6 +132,8 @@ ScreenRecorder.exe --snapshot ui.png :: chụp giao diện ra ảnh
 ```
 
 </details>
+
+Xem [lịch sử phiên bản](CHANGELOG.md).
 
 ## 📄 Ghi công
 

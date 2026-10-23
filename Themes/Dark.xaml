@@ -617,4 +617,21 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- ProgressBar phang, khong co hieu ung chay sang mac dinh (tranh WPF ve lien tuc ton CPU) -->
+    <Style TargetType="ProgressBar">
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="Background" Value="{StaticResource TrackBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid>
+                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3"/>
+                        <Border x:Name="PART_Indicator" HorizontalAlignment="Left"
+                                Background="{TemplateBinding Foreground}" CornerRadius="3"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

@@ -64,6 +64,45 @@ namespace ScreenRecorderApp.Services
             var first = (r.Out ?? "").Split('\n').FirstOrDefault()?.Trim() ?? "";
             return first.Length > 0 ? first : "Không đọc được phiên bản ffmpeg";
         }
+
+        /// <summary>
+        /// Thu nhanh duong chup Desktop Duplication (ddagrab) voi dung bo ma hoa se dung, 1 giay, ghi ra NUL.
+        /// Kiem tra ca kich thuoc khung hinh: neu khac kich thuoc man hinh (man hinh xoay, sai chi so DXGI) -> khong dung.
+        /// </summary>
+        public static async Task<(bool Ok, string Reason)> TestDdaAsync(RecordingOptions template)
+        {
+            var o = new RecordingOptions
+            {
+                FfmpegPath = template.FfmpegPath,
+                Area = template.Area,
+                UseDda = true,
+                DdaIndex = template.DdaIndex,
+                EncoderKey = template.EncoderKey,
+                Codec = template.Codec,
+                Fps = 5,
+                Quality = template.Quality,
+                ScaleHeight = 0,
+                DrawMouse = template.DrawMouse,
+                RecordFile = "NUL",
+                DurationSeconds = 1,
+                LogLevel = "info",
+            };
+            var r = await ProcessUtil.RunAsync(o.FfmpegPath, FfmpegArgs.Build(o), 15000).ConfigureAwait(false);
+            if (r.Code != 0)
+            {
+                string last = (r.Err ?? "").Split('\n').Select(x => x.Trim()).LastOrDefault(x => x.Length > 0) ?? "";
+                return (false, $"Desktop Duplication không chạy được ({(r.Code == -999 ? "quá thời gian" : last)})");
+            }
+            var m = Regex.Match(r.Err ?? "", @"Stream #0:0.*?Video:.*?\s(\d{2,5})x(\d{2,5})");
+            if (m.Success)
+            {
+                int w = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
+                int h = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+                if (Math.Abs(w - template.Area.Width) > 2 || Math.Abs(h - template.Area.Height) > 2)
+                    return (false, $"Desktop Duplication trả về {w}×{h}, khác màn hình {template.Area.Width}×{template.Area.Height} (màn hình xoay?)");
+            }
+            return (true, "");
+        }
     }
 
     public sealed class RecordingOptions
@@ -90,10 +129,11 @@ namespace ScreenRecorderApp.Services
         public bool Ducking { get; set; }
         public bool SeparateTracks { get; set; }
         public int AudioOffsetMs { get; set; }
-        public int AudioBitrateK { get; set; } = 160;
+        public int AudioBitrateK { get; set; } = 128;
         public int DurationSeconds { get; set; }
         /// <summary>Chi dung cho --selftest --fake-video: anh test thay cho man hinh.</summary>
         public bool TestPattern { get; set; }
+        public string LogLevel { get; set; } = "warning";
     }
 
     internal static class FfmpegArgs
@@ -147,7 +187,7 @@ namespace ScreenRecorderApp.Services
 
         public static List<string> Build(RecordingOptions o)
         {
-            var a = new List<string> { "-hide_banner", "-loglevel", "warning", "-nostats", "-progress", "pipe:1", "-y" };
+            var a = new List<string> { "-hide_banner", "-loglevel", o.LogLevel, "-nostats", "-progress", "pipe:1", "-y" };
 
             int capW = o.Area.Width & ~1, capH = o.Area.Height & ~1;
             int outW = capW, outH = capH;
@@ -255,7 +295,7 @@ namespace ScreenRecorderApp.Services
             var vf = new List<string>();
             if (!qsvDda)
             {
-                if (scale) vf.Add($"scale={outW}:{outH}:flags=bicubic");
+                if (scale) vf.Add($"scale={outW}:{outH}:flags=fast_bilinear");
                 vf.Add("format=" + PixFmtFor(o.EncoderKey));
             }
             if (vf.Count > 0) a.AddRange(new[] { "-vf", string.Join(",", vf) });
@@ -263,7 +303,9 @@ namespace ScreenRecorderApp.Services
             // ---------------- Ma hoa
             a.AddRange(new[] { "-c:v", o.Codec });
             a.AddRange(QualityArgs(o.EncoderKey, o.Quality));
-            a.AddRange(new[] { "-g", (o.Fps * 2).ToString(Inv), "-bf", "0" });
+            // Khung hinh khoa moi 10 giay (truoc: 2 giay). Bai giang phan lon dung yen -> khung khoa chiem phan lon
+            // dung luong; gian ra 10 giay giam ~70% dung luong video ma chu van ro nhu cu (do SSIM ~0.9994).
+            a.AddRange(new[] { "-g", (o.Fps * 10).ToString(Inv), "-bf", "0" });
             if (audioMaps.Count > 0)
             {
                 a.AddRange(new[] { "-c:a", "aac", "-b:a", o.AudioBitrateK.ToString(Inv) + "k", "-ar", "48000", "-ac", "2" });

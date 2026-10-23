@@ -58,6 +58,13 @@ namespace ScreenRecorderApp
         private int _previewTick;
         private bool _suppress = true;
         private string? _lastFile;
+        /// <summary>Ket qua thu Desktop Duplication theo man hinh + bo ma hoa (tranh thu lai moi lan ghi).</summary>
+        private readonly Dictionary<string, (bool Ok, string Reason)> _ddaProbe = new Dictionary<string, (bool Ok, string Reason)>();
+        private readonly Queue<(string File, string Mode)> _compressQueue = new Queue<(string File, string Mode)>();
+        private System.Threading.CancellationTokenSource? _compressCts;
+        private bool _compressing;
+        private string _compressName = "";
+        private double _compressPct;
         private string _lastCommandLine = "";
         private System.Threading.CancellationTokenSource? _playCts;
         private WinForms.NotifyIcon? _tray;
@@ -72,7 +79,7 @@ namespace ScreenRecorderApp
             var work = SystemParameters.WorkArea;
             if (Height > work.Height) Height = Math.Max(MinHeight, work.Height);
             if (Width > work.Width) Width = Math.Max(MinWidth, work.Width);
-            _meterTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
+            _meterTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(50) };
             _meterTimer.Tick += (s, e) => UpdateMeters();
             _previewTimer = new DispatcherTimer { Interval = PreviewIdleInterval };
             _previewTimer.Tick += (s, e) => RefreshPreview();
@@ -104,6 +111,8 @@ namespace ScreenRecorderApp
             _suppress = true;
             try
             {
+                var ver = typeof(MainWindow).Assembly.GetName().Version;
+                HeaderSubtitle.Text = $"Phiên bản {ver.Major}.{ver.Minor}  •  " + HeaderSubtitle.Text;
                 PopulateChoices();
                 ApplySettingsToControls();
                 LocateFfmpeg();
@@ -122,6 +131,7 @@ namespace ScreenRecorderApp
             _previewTimer.Start();
             RefreshPreview(true);
             Log("Khởi động xong. Thư mục lưu: " + GetOutputDir(false));
+            CleanupCompressTemp();
             await ProbeEncodersAsync();
         }
 
@@ -129,10 +139,19 @@ namespace ScreenRecorderApp
         {
             CaptureCombo.ItemsSource = new[]
             {
-                new Choice<string>("GDI (gdigrab) — ổn định, mọi máy", "gdigrab"),
-                new Choice<string>("Desktop Duplication (ddagrab) — GPU, nhẹ CPU", "ddagrab"),
+                new Choice<string>("Tự động — nhẹ CPU nhất (khuyên dùng)", "auto"),
+                new Choice<string>("GDI (gdigrab) — tương thích tối đa", "gdigrab"),
             };
-            FpsCombo.ItemsSource = new[] { 10, 15, 20, 24, 30, 60 }.Select(f => new Choice<int>($"{f} fps", f)).ToList();
+            FpsCombo.ItemsSource = new[]
+            {
+                new Choice<int>("5 fps — chỉ slide, nhẹ nhất", 5),
+                new Choice<int>("10 fps — máy yếu, chỉ có slide", 10),
+                new Choice<int>("15 fps — lớp học online (khuyên dùng)", 15),
+                new Choice<int>("20 fps", 20),
+                new Choice<int>("24 fps", 24),
+                new Choice<int>("30 fps — mượt, tốn CPU hơn", 30),
+                new Choice<int>("60 fps — rất tốn CPU", 60),
+            };
             QualityCombo.ItemsSource = new[]
             {
                 new Choice<string>("Thấp — file nhỏ, nhẹ máy", "low"),
@@ -152,6 +171,12 @@ namespace ScreenRecorderApp
                 new Choice<string>("MKV — an toàn tuyệt đối", "mkv"),
             };
             BitrateCombo.ItemsSource = new[] { 96, 128, 160, 192, 256 }.Select(b => new Choice<int>($"{b} kbps", b)).ToList();
+            CompressCombo.ItemsSource = new[]
+            {
+                new Choice<string>("Không nén — giữ nguyên file sau khi ghi", "none"),
+                new Choice<string>("Nén vừa — nhỏ hơn nhiều, chữ vẫn nét (khuyên dùng)", "medium"),
+                new Choice<string>("Nén mạnh — file nhỏ nhất, tiếng mono", "strong"),
+            };
         }
 
         private void ApplySettingsToControls()
@@ -162,6 +187,8 @@ namespace ScreenRecorderApp
             SelectChoice(ResolutionCombo, _settings.ScaleHeight);
             SelectChoice(FormatCombo, _settings.Container);
             SelectChoice(BitrateCombo, _settings.AudioBitrateK);
+            SelectChoice(CompressCombo, _settings.CompressMode);
+            UpdateCompressHint();
             DrawMouseCheck.IsChecked = _settings.DrawMouse;
             SysEnabled.IsChecked = _settings.SystemAudioEnabled;
             MicEnabled.IsChecked = _settings.MicEnabled;
@@ -197,7 +224,7 @@ namespace ScreenRecorderApp
             CaptureCombo.SelectionChanged += (s, e) =>
             {
                 if (_suppress) return;
-                _settings.CaptureMethod = Sel(CaptureCombo, "gdigrab");
+                _settings.CaptureMethod = Sel(CaptureCombo, "auto");
                 Persist();
                 UpdateCaptureInfo();
             };
@@ -254,11 +281,18 @@ namespace ScreenRecorderApp
                 UpdateEncoderHint();
                 UpdateCaptureInfo();
             };
-            FpsCombo.SelectionChanged += (s, e) => { if (!_suppress) { _settings.Fps = Sel(FpsCombo, 30); Persist(); } };
+            FpsCombo.SelectionChanged += (s, e) => { if (!_suppress) { _settings.Fps = Sel(FpsCombo, 15); Persist(); } };
             QualityCombo.SelectionChanged += (s, e) => { if (!_suppress) { _settings.Quality = Sel(QualityCombo, "medium"); Persist(); } };
             ResolutionCombo.SelectionChanged += (s, e) => { if (!_suppress) { _settings.ScaleHeight = Sel(ResolutionCombo, 0); Persist(); } };
             FormatCombo.SelectionChanged += (s, e) => { if (!_suppress) { _settings.Container = Sel(FormatCombo, "mp4"); Persist(); } };
-            BitrateCombo.SelectionChanged += (s, e) => { if (!_suppress) { _settings.AudioBitrateK = Sel(BitrateCombo, 160); Persist(); } };
+            BitrateCombo.SelectionChanged += (s, e) => { if (!_suppress) { _settings.AudioBitrateK = Sel(BitrateCombo, 128); Persist(); } };
+            CompressCombo.SelectionChanged += (s, e) =>
+            {
+                if (_suppress) return;
+                _settings.CompressMode = Sel(CompressCombo, "none");
+                Persist();
+                UpdateCompressHint();
+            };
             OutputDirBox.LostFocus += (s, e) =>
             {
                 var t = OutputDirBox.Text.Trim();
@@ -399,29 +433,63 @@ namespace ScreenRecorderApp
         private bool CanUseDda(MonitorInfo m, out string reason)
         {
             reason = "";
-            if (_settings.CaptureMethod != "ddagrab") return false;
-            if (!_ddagrabAvailable) { reason = "Bản ffmpeg này không có ddagrab → dùng GDI."; return false; }
-            if (m.IsAllScreens) { reason = "ddagrab chỉ ghi được 1 màn hình → dùng GDI."; return false; }
+            if (_settings.CaptureMethod != "auto") return false;
+            if (!_ddagrabAvailable) { reason = "Bản ffmpeg này không có Desktop Duplication → dùng GDI."; return false; }
+            if (m.IsAllScreens) { reason = "Ghi tất cả màn hình cần GDI."; return false; }
             if (!m.DxgiOutputIndex.HasValue) { reason = "Màn hình này không thuộc GPU chính → dùng GDI."; return false; }
+            if (_ddaProbe.TryGetValue(DdaKey(m, ResolveEncoder()), out var probed) && !probed.Ok)
+            {
+                reason = probed.Reason + " → dùng GDI.";
+                return false;
+            }
             return true;
         }
+
+        private static string DdaKey(MonitorInfo m, EncoderInfo? enc) =>
+            $"{m.Key}|{m.Bounds}|{m.DxgiOutputIndex}|{enc?.Key}";
 
         private void UpdateCaptureInfo()
         {
             if (!(MonitorList.SelectedItem is MonitorInfo m)) { PreviewInfo.Text = ""; return; }
             var b = m.Bounds;
             PreviewInfo.Text = $"{b.Width}×{b.Height}  •  vị trí ({b.X}, {b.Y})" + (m.DxgiOutputIndex.HasValue ? $"  •  DXGI #{m.DxgiOutputIndex}" : "");
-            if (_settings.CaptureMethod == "ddagrab")
-                CaptureHint.Text = CanUseDda(m, out var reason) ? "Desktop Duplication: ít tốn CPU nhất." : reason;
+            if (_settings.CaptureMethod != "auto")
+                CaptureHint.Text = "GDI: tương thích mọi máy, tốn CPU hơn.";
+            else if (!CanUseDda(m, out var reason))
+                CaptureHint.Text = reason;
+            else if (_ddaProbe.TryGetValue(DdaKey(m, ResolveEncoder()), out var ok) && ok.Ok)
+                CaptureHint.Text = "Đang dùng Desktop Duplication (GPU) — ít tốn CPU nhất.";
             else
-                CaptureHint.Text = "GDI: tương thích mọi máy.";
+                CaptureHint.Text = "Ưu tiên Desktop Duplication (GPU, ít tốn CPU); tự chuyển GDI nếu máy không hỗ trợ.";
+        }
+
+        /// <summary>Thu (co cache) xem Desktop Duplication co chay duoc voi man hinh + bo ma hoa nay khong.</summary>
+        private async Task<bool> EnsureDdaAsync(MonitorInfo m, EncoderInfo enc, RecordingOptions template)
+        {
+            if (!CanUseDda(m, out var reason))
+            {
+                if (_settings.CaptureMethod == "auto" && !string.IsNullOrEmpty(reason)) Log(reason);
+                return false;
+            }
+            string key = DdaKey(m, enc);
+            if (!_ddaProbe.TryGetValue(key, out var r))
+            {
+                SetStatus("Đang kiểm tra cách chụp nhẹ nhất…", "WarnBrush", false);
+                try { r = await EncoderProbe.TestDdaAsync(template); }
+                catch (Exception ex) { r = (false, "Desktop Duplication lỗi: " + ex.Message); }
+                _ddaProbe[key] = r;
+                Log(r.Ok ? $"Desktop Duplication dùng được cho {m.Title} → nhẹ CPU." : r.Reason + " → dùng GDI.");
+                UpdateCaptureInfo();
+            }
+            return r.Ok;
         }
 
         private static readonly TimeSpan PreviewIdleInterval = TimeSpan.FromMilliseconds(400);
-        private static readonly TimeSpan PreviewRecordingInterval = TimeSpan.FromSeconds(1);
+        // Khi dang ghi: anh xem truoc chi cap nhat thua (3 giay) de nhuong CPU cho viec ghi
+        private static readonly TimeSpan PreviewRecordingInterval = TimeSpan.FromSeconds(3);
 
         /// <summary>
-        /// Lam moi anh xem truoc man hinh dang chon (~2.5 hinh/giay, 1 hinh/giay khi dang ghi)
+        /// Lam moi anh xem truoc man hinh dang chon (~2.5 hinh/giay, 1 hinh/3 giay khi dang ghi)
         /// va anh thu nho cua tat ca man hinh (~2 giay/lan, tam dung khi dang ghi).
         /// </summary>
         private async void RefreshPreview(bool forceThumbnails = false)
@@ -579,6 +647,8 @@ namespace ScreenRecorderApp
 
         private void UpdateMeters()
         {
+            // Cua so an / thu nho: khong ve thanh muc am (do ton CPU khi dang ghi)
+            if (!IsVisible || WindowState == WindowState.Minimized) return;
             SysMeter.SetLevel(_sysSource?.ReadPeak() ?? 0f);
             MicMeter.SetLevel(_micSource?.ReadPeak() ?? 0f);
         }
@@ -765,7 +835,7 @@ namespace ScreenRecorderApp
             else await StartRecordingAsync(test: false);
         }
 
-        private async Task StartRecordingAsync(bool test)
+        private async Task StartRecordingAsync(bool test, bool resume = false)
         {
             if (_session != null || _busy) return;
             if (_ffmpeg == null)
@@ -794,7 +864,19 @@ namespace ScreenRecorderApp
                     return;
                 }
 
-                if (_settings.Countdown && !test)
+                // Thu Desktop Duplication (chay song song voi dem nguoc)
+                var ddaTask = EnsureDdaAsync(monitor, enc, new RecordingOptions
+                {
+                    FfmpegPath = _ffmpeg,
+                    Area = monitor.Bounds,
+                    DdaIndex = monitor.DxgiOutputIndex ?? 0,
+                    EncoderKey = enc.Key,
+                    Codec = enc.Codec,
+                    Quality = _settings.Quality,
+                    DrawMouse = _settings.DrawMouse,
+                });
+
+                if (_settings.Countdown && !test && !resume)
                 {
                     for (int i = 3; i > 0; i--)
                     {
@@ -803,12 +885,11 @@ namespace ScreenRecorderApp
                         await Task.Delay(1000);
                     }
                 }
+                bool useDda = await ddaTask;
 
                 string dir = GetOutputDir(true);
                 string baseName = (test ? "Test_" : "Rec_") + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
                 string container = test ? "mp4" : _settings.Container;
-                bool useDda = CanUseDda(monitor, out var ddaReason);
-                if (!string.IsNullOrEmpty(ddaReason)) Log(ddaReason);
 
                 var opts = new RecordingOptions
                 {
@@ -925,7 +1006,19 @@ namespace ScreenRecorderApp
             RecordButton.IsEnabled = true;
 
             bool normal = code == 0 || session.StopRequested;
-            if (!normal || result == null)
+            // Desktop Duplication co the mat quyen giua chung (khoa may, hop thoai UAC, doi do phan giai...)
+            // -> khong de mat bai hoc: tu ghi tiep sang file moi bang GDI.
+            bool resumeWithGdi = !normal && !test && !_closeAfterStop && session.Options.UseDda
+                                 && _recClock.Elapsed > TimeSpan.FromSeconds(5);
+            if (resumeWithGdi && MonitorList.SelectedItem is MonitorInfo curMon)
+            {
+                var enc = ResolveEncoder();
+                _ddaProbe[DdaKey(curMon, enc)] = (false, "Desktop Duplication bị ngắt khi đang ghi");
+                Log("⚠ Desktop Duplication bị ngắt khi đang ghi → tự ghi tiếp bằng GDI vào file mới.");
+                if (!string.IsNullOrWhiteSpace(errors)) Log(errors);
+                _tray?.ShowBalloonTip(3000, "Screen Recorder", "Đã tự chuyển sang GDI và ghi tiếp vào file mới.", WinForms.ToolTipIcon.Warning);
+            }
+            else if (!normal || result == null)
             {
                 Log($"FFmpeg dừng bất thường (mã {code}).");
                 if (!string.IsNullOrWhiteSpace(errors)) Log(errors);
@@ -946,8 +1039,10 @@ namespace ScreenRecorderApp
                 if (test) OpenWithShell(result);
                 else if (_tray != null && !IsVisible)
                     _tray.ShowBalloonTip(3000, "Đã lưu video", Path.GetFileName(result), WinForms.ToolTipIcon.Info);
+                if (!test && !_closeAfterStop && _settings.CompressMode != "none") EnqueueCompress(result);
             }
 
+            if (resumeWithGdi) { await StartRecordingAsync(test: false, resume: true); return; }
             if (_closeAfterStop) Close();
         }
 
@@ -979,9 +1074,13 @@ namespace ScreenRecorderApp
             StatusDot.Fill = (Brush)FindResource(brushKey);
             if (pulse)
             {
+                // Hieu ung nhap nhay chi can ~15 khung/giay (mac dinh WPF ve 60 khung/giay -> ton CPU khi dang ghi)
                 var anim = new DoubleAnimation(1, 0.2, TimeSpan.FromMilliseconds(650)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
+                Timeline.SetDesiredFrameRate(anim, 15);
                 StatusDot.BeginAnimation(OpacityProperty, anim);
-                RecBadge.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0.55, TimeSpan.FromMilliseconds(900)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever });
+                var badge = new DoubleAnimation(1, 0.55, TimeSpan.FromMilliseconds(900)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
+                Timeline.SetDesiredFrameRate(badge, 15);
+                RecBadge.BeginAnimation(OpacityProperty, badge);
             }
             else
             {
@@ -1136,6 +1235,126 @@ namespace ScreenRecorderApp
 
         private void Probe_Click(object sender, RoutedEventArgs e) => _ = ProbeEncodersAsync();
 
+        // =====================================================================
+        //  Nen video (sau khi ghi / file co san) — chay nen, uu tien thap
+        // =====================================================================
+
+        /// <summary>Xoa file tam con sot lai neu lan truoc thoat khi dang nen.</summary>
+        private void CleanupCompressTemp()
+        {
+            try
+            {
+                foreach (var f in Directory.GetFiles(GetOutputDir(false), "*.dang-nen.*"))
+                    try { File.Delete(f); } catch { }
+            }
+            catch { }
+        }
+
+        private void UpdateCompressHint()
+        {
+            switch (_settings.CompressMode)
+            {
+                case "medium":
+                    CompressHint.Text = "Sau khi dừng ghi, video được nén lại ở mức ưu tiên thấp (không làm chậm máy). " +
+                                        "File nén thay thế file gốc trong cùng thư mục (chỉ khi nhỏ hơn).";
+                    break;
+                case "strong":
+                    CompressHint.Text = "Nén nhiều nhất: tối đa 15 fps, tiếng mono — chữ vẫn nét, hình thầy cô vẫn mượt. " +
+                                        "Chạy nền ở mức ưu tiên thấp; file nén thay thế file gốc trong cùng thư mục.";
+                    break;
+                default:
+                    CompressHint.Text = "Giữ nguyên file vừa ghi (nhẹ máy nhất). Có thể bấm “Nén file có sẵn…” để nén bất kỳ lúc nào.";
+                    break;
+            }
+        }
+
+        private void EnqueueCompress(string file, string? mode = null)
+        {
+            string m = mode ?? (_settings.CompressMode == "none" ? "medium" : _settings.CompressMode);
+            if (_compressQueue.Any(q => q.File.Equals(file, StringComparison.OrdinalIgnoreCase))) return;
+            _compressQueue.Enqueue((file, m));
+            if (!_compressing) _ = RunCompressQueueAsync();
+            else UpdateCompressUi();
+        }
+
+        private async Task RunCompressQueueAsync()
+        {
+            if (_ffmpeg == null || _compressing) return;
+            _compressing = true;
+            try
+            {
+                while (_compressQueue.Count > 0)
+                {
+                    var (file, mode) = _compressQueue.Dequeue();
+                    _compressCts = new System.Threading.CancellationTokenSource();
+                    _compressName = Path.GetFileName(file);
+                    _compressPct = 0;
+                    UpdateCompressUi();
+                    var r = await VideoCompressor.CompressAsync(_ffmpeg, file, mode,
+                        p => Dispatcher.InvokeAsync(() => { _compressPct = p; UpdateCompressUi(); }),
+                        Log, _compressCts.Token);
+                    _compressCts.Dispose();
+                    _compressCts = null;
+
+                    if (r.Ok && r.BytesAfter < r.BytesBefore)
+                    {
+                        int saved = (int)Math.Round(100.0 * (r.BytesBefore - r.BytesAfter) / r.BytesBefore);
+                        string msg = $"Đã nén {Path.GetFileName(r.File)}: {FormatBytes(r.BytesBefore)} → {FormatBytes(r.BytesAfter)} (giảm {saved}%)";
+                        Log(msg + (string.IsNullOrEmpty(r.Message) ? "" : " — " + r.Message));
+                        if (_session == null) LastFileText.Text = msg;
+                        if (_tray != null && !IsVisible)
+                            _tray.ShowBalloonTip(3000, "Đã nén video", msg, WinForms.ToolTipIcon.Info);
+                    }
+                    else Log($"{Path.GetFileName(file)}: {r.Message}");
+                    if (r.Cancelled) { _compressQueue.Clear(); break; }
+                }
+            }
+            catch (Exception ex) { Log("Lỗi khi nén video: " + ex.Message); }
+            finally
+            {
+                _compressing = false;
+                UpdateCompressUi();
+            }
+        }
+
+        private void UpdateCompressUi()
+        {
+            CompressProgressPanel.Visibility = _compressing ? Visibility.Visible : Visibility.Collapsed;
+            if (!_compressing) return;
+            string more = _compressQueue.Count > 0 ? $"  (còn {_compressQueue.Count} file chờ)" : "";
+            CompressStatusText.Text = $"Đang nén {_compressName} — {_compressPct * 100:0}%{more}";
+            CompressProgress.Value = _compressPct * 100;
+        }
+
+        private void CompressFile_Click(object sender, RoutedEventArgs e)
+        {
+            if (_ffmpeg == null) return;
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Chọn video cần nén",
+                Filter = "Video (*.mp4;*.mkv)|*.mp4;*.mkv|Tất cả file (*.*)|*.*",
+                Multiselect = true,
+                InitialDirectory = GetOutputDir(false),
+            };
+            if (dlg.ShowDialog(this) != true) return;
+            string recording = _session?.Options.RecordFile ?? "";
+            var files = dlg.FileNames.Where(f => !f.Equals(recording, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (files.Count == 0) return;
+            string mode = _settings.CompressMode == "none" ? "medium" : _settings.CompressMode;
+            var r = MessageBox.Show(this,
+                $"Nén {files.Count} video ({VideoCompressor.Describe(mode)})?\n\n" +
+                "Việc nén chạy nền ở mức ưu tiên thấp. File nén sẽ thay thế file gốc (chỉ khi nhỏ hơn).",
+                "Screen Recorder", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (r != MessageBoxResult.Yes) return;
+            foreach (var f in files) EnqueueCompress(f, mode);
+        }
+
+        private void CompressCancel_Click(object sender, RoutedEventArgs e)
+        {
+            _compressQueue.Clear();
+            _compressCts?.Cancel();
+        }
+
         private void CopyCmd_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(_lastCommandLine)) { Log("Chưa có lệnh FFmpeg nào (hãy ghi thử trước)."); return; }
@@ -1223,6 +1442,18 @@ namespace ScreenRecorderApp
                     _ = StopRecordingAsync();
                 }
                 return;
+            }
+            if (_compressing)
+            {
+                if (!_closeAfterStop)
+                {
+                    var r = MessageBox.Show(this,
+                        $"Đang nén video ({_compressPct * 100:0}%). Thoát sẽ hủy nén, file gốc vẫn được giữ nguyên.\n\nVẫn thoát?",
+                        "Screen Recorder", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (r != MessageBoxResult.Yes) { e.Cancel = true; return; }
+                }
+                _compressQueue.Clear();
+                _compressCts?.Cancel();
             }
             _settings.Save();
         }

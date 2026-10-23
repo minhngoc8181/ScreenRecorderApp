@@ -49,7 +49,7 @@
                 </Border>
                 <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="Screen Recorder" FontSize="21" FontWeight="SemiBold" FontFamily="{StaticResource DisplayFont}"/>
-                    <TextBlock Text="FFmpeg chạy nền  •  Âm thanh hệ thống (WASAPI loopback) + Microphone" Style="{StaticResource Hint}"/>
+                    <TextBlock x:Name="HeaderSubtitle" Text="FFmpeg chạy nền  •  Âm thanh hệ thống (WASAPI loopback) + Microphone" Style="{StaticResource Hint}"/>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Border x:Name="StatusPill" CornerRadius="15" Padding="12,6" Background="{StaticResource Surface2Brush}"
@@ -408,6 +408,39 @@
                                                 <TextBlock Text="Định dạng file" Style="{StaticResource FieldLabel}"/>
                                                 <ComboBox x:Name="FormatCombo"/>
                                             </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Nén video để giảm dung lượng" Style="{StaticResource FieldLabel}"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="CompressCombo"/>
+                                            <Button x:Name="CompressFileButton" Grid.Column="1" Margin="8,0,0,0" Click="CompressFile_Click"
+                                                    ToolTip="Chọn video đã ghi trước đây để nén lại">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE8B7;" Style="{StaticResource Icon}" FontSize="13"/>
+                                                    <TextBlock Text="Nén file có sẵn…" Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                        <TextBlock x:Name="CompressHint" Margin="0,8,0,0" Style="{StaticResource Hint}" TextWrapping="Wrap"/>
+                                        <Grid x:Name="CompressProgressPanel" Margin="0,10,0,0" Visibility="Collapsed">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock x:Name="CompressStatusText" TextTrimming="CharacterEllipsis"/>
+                                                <ProgressBar x:Name="CompressProgress" Height="6" Margin="0,6,0,0" Minimum="0" Maximum="100"
+                                                             Foreground="{StaticResource AccentBrush}" Background="{StaticResource TrackBrush}" BorderThickness="0"/>
+                                            </StackPanel>
+                                            <Button x:Name="CompressCancelButton" Grid.Column="1" Margin="12,0,0,0" Click="CompressCancel_Click" Content="Hủy nén"/>
                                         </Grid>
                                     </StackPanel>
                                 </Border>
